@@ -1,0 +1,27 @@
+{
+  "name": "tswebscraper",
+  "version": "1.0.0",
+  "description": "Webscraper project in typescript for bootdev lessons",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "tsx ./src/index.ts",
+    "test": "vitest run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Trptguy09/tswebscraper.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Trptguy09/tswebscraper/issues"
+  },
+  "homepage": "https://github.com/Trptguy09/tswebscraper#readme",
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}
