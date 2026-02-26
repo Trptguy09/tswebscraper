@@ -44,3 +44,63 @@ export function getFirstParagraphFromHTML(htmlString: string): string {
     const p = (main?.querySelector("p")) ?? doc.querySelector("p");
     return p?.textContent?.trim() ?? "";
 }
+
+export function getURLsFromHTML(htmlString: string, baseURL: string): string[] {
+    let allURLs: string[] = [];
+    const dom = new JSDOM(htmlString);
+    const a = dom.window.document.querySelectorAll("a");
+    for (let i=0; i < a.length; i++) {
+      const link = a[i].getAttribute("href")
+      if (!link) {
+        continue;
+      }
+      try {
+        const absolute = new URL(link, baseURL).href;
+        allURLs.push(absolute)
+      } catch (error) {
+        console.error("Error:", error)
+      }
+    }
+  return allURLs;
+}
+
+export function getImagesFromHTML(htmlString: string, baseURL: string): string[] {
+    let allImages: string[] = [];
+    const dom = new JSDOM(htmlString);
+    const img = dom.window.document.querySelectorAll("img");
+    for (let i=0; i < img.length; i++) {
+      const link = img[i].getAttribute("src")
+      if (!link) {
+        continue;
+      }
+      try{
+      const absolute = new URL(link, baseURL).href;
+      allImages.push(absolute)
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  }
+  return allImages;
+}
+
+export type ExtractedPageData = {
+  url: string;
+  h1: string;
+  first_paragraph: string,
+  outgoing_links: string[],
+  image_urls: string[],
+}
+
+export function extractPageData(htmlString: string, pageURL: string): ExtractedPageData {
+  return {
+    url: pageURL,
+    h1: getH1FromHTML(htmlString),
+    first_paragraph: getFirstParagraphFromHTML(htmlString),
+    outgoing_links: getURLsFromHTML(htmlString, pageURL),
+    image_urls: getImagesFromHTML(htmlString, pageURL),
+  };
+}
+
+async function getHTML(url: string){
+  //?
+}

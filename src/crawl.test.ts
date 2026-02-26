@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import { normalizeURL, getH1FromHTML, getFirstParagraphFromHTML } from './crawl'
+import { normalizeURL, getH1FromHTML, getFirstParagraphFromHTML, getImagesFromHTML, getURLsFromHTML, extractPageData } from './crawl'
+import type { ExtractedPageData } from './crawl';
 
 // --- Test Suite for normalizeURL ---
 describe('normalizeURL', () => {
@@ -131,4 +132,224 @@ describe('getFirstParagraphFromHTML', () => {
   });
 });
 
-// --- Test Suite for getFirstParagraphFromHTML ---
+
+// --- Additional Tests for getURLsFromHTML --- //
+
+test("getURLsFromHTML handles absolute URLs", () => {
+  const inputURL = "https://blog.boot.dev";
+  const inputBody = `
+    <html>
+      <body>
+        <a href="https://example.com/page">External</a>
+      </body>
+    </html>
+  `;
+
+  const actual = getURLsFromHTML(inputBody, inputURL);
+  const expected = ["https://example.com/page"];
+
+  expect(actual).toEqual(expected);
+});
+
+test("getURLsFromHTML handles multiple links", () => {
+  const inputURL = "https://blog.boot.dev";
+  const inputBody = `
+    <html>
+      <body>
+        <a href="/one">One</a>
+        <a href="/two">Two</a>
+      </body>
+    </html>
+  `;
+
+  const actual = getURLsFromHTML(inputBody, inputURL);
+  const expected = [
+    "https://blog.boot.dev/one",
+    "https://blog.boot.dev/two"
+  ];
+
+  expect(actual).toEqual(expected);
+});
+
+test("getURLsFromHTML ignores anchor tags without href", () => {
+  const inputURL = "https://blog.boot.dev";
+  const inputBody = `
+    <html>
+      <body>
+        <a>No href</a>
+        <a href="/valid">Valid</a>
+      </body>
+    </html>
+  `;
+
+  const actual = getURLsFromHTML(inputBody, inputURL);
+  const expected = ["https://blog.boot.dev/valid"];
+
+  expect(actual).toEqual(expected);
+});
+
+test("getURLsFromHTML returns empty array if no links exist", () => {
+  const inputURL = "https://blog.boot.dev";
+  const inputBody = `<html><body><div>No links</div></body></html>`;
+
+  const actual = getURLsFromHTML(inputBody, inputURL);
+  const expected: string[] = [];
+
+  expect(actual).toEqual(expected);
+});
+
+
+// --- Additional Tests for getImagesFromHTML --- //
+
+test("getImagesFromHTML handles absolute image URLs", () => {
+  const inputURL = "https://blog.boot.dev";
+  const inputBody = `
+    <html>
+      <body>
+        <img src="https://example.com/image.png" />
+      </body>
+    </html>
+  `;
+
+  const actual = getImagesFromHTML(inputBody, inputURL);
+  const expected = ["https://example.com/image.png"];
+
+  expect(actual).toEqual(expected);
+});
+
+test("getImagesFromHTML handles multiple images", () => {
+  const inputURL = "https://blog.boot.dev";
+  const inputBody = `
+    <html>
+      <body>
+        <img src="/one.png" />
+        <img src="/two.png" />
+      </body>
+    </html>
+  `;
+
+  const actual = getImagesFromHTML(inputBody, inputURL);
+  const expected = [
+    "https://blog.boot.dev/one.png",
+    "https://blog.boot.dev/two.png"
+  ];
+
+  expect(actual).toEqual(expected);
+});
+
+test("getImagesFromHTML ignores img tags without src", () => {
+  const inputURL = "https://blog.boot.dev";
+  const inputBody = `
+    <html>
+      <body>
+        <img />
+        <img src="/valid.png" />
+      </body>
+    </html>
+  `;
+
+  const actual = getImagesFromHTML(inputBody, inputURL);
+  const expected = ["https://blog.boot.dev/valid.png"];
+
+  expect(actual).toEqual(expected);
+});
+
+test("getImagesFromHTML returns empty array if no images exist", () => {
+  const inputURL = "https://blog.boot.dev";
+  const inputBody = `<html><body><div>No images</div></body></html>`;
+
+  const actual = getImagesFromHTML(inputBody, inputURL);
+  const expected: string[] = [];
+
+  expect(actual).toEqual(expected);
+});
+
+// --- Test Suite for extractPageData --- //
+
+describe('extractPageData', () => {
+  test('should extract all page data correctly', () => {
+    const inputURL = 'https://blog.boot.dev';
+
+    const html = `
+      <html>
+        <body>
+          <h1>Page Title</h1>
+          <main>
+            <p>This is the first paragraph.</p>
+            <p>Second paragraph.</p>
+          </main>
+          <a href="/about">About</a>
+          <a href="https://example.com/contact">Contact</a>
+          <img src="/image.png" />
+          <img src="https://cdn.com/logo.jpg" />
+        </body>
+      </html>
+    `;
+
+    const actual = extractPageData(html, inputURL);
+
+    const expected: ExtractedPageData = {
+      url: inputURL,
+      h1: 'Page Title',
+      first_paragraph: 'This is the first paragraph.',
+      outgoing_links: [
+        'https://blog.boot.dev/about',
+        'https://example.com/contact'
+      ],
+      image_urls: [
+        'https://blog.boot.dev/image.png',
+        'https://cdn.com/logo.jpg'
+      ]
+    };
+
+    expect(actual).toEqual(expected);
+  });
+
+  test('should return empty strings and arrays when no content exists', () => {
+    const inputURL = 'https://blog.boot.dev';
+    const html = `<html><body></body></html>`;
+
+    const actual = extractPageData(html, inputURL);
+
+    const expected: ExtractedPageData = {
+      url: inputURL,
+      h1: '',
+      first_paragraph: '',
+      outgoing_links: [],
+      image_urls: []
+    };
+
+    expect(actual).toEqual(expected);
+  });
+
+  test('should correctly resolve relative URLs', () => {
+    const inputURL = 'https://blog.boot.dev/blog/';
+    const html = `
+      <html>
+        <body>
+          <a href="post">Post</a>
+          <img src="image.jpg" />
+        </body>
+      </html>
+    `;
+
+    const actual = extractPageData(html, inputURL);
+
+    expect(actual.outgoing_links).toEqual([
+      'https://blog.boot.dev/blog/post'
+    ]);
+
+    expect(actual.image_urls).toEqual([
+      'https://blog.boot.dev/blog/image.jpg'
+    ]);
+  });
+
+  test('should still return the correct URL even if HTML is empty', () => {
+    const inputURL = 'https://blog.boot.dev';
+    const html = '';
+
+    const actual = extractPageData(html, inputURL);
+
+    expect(actual.url).toBe(inputURL);
+  });
+});
