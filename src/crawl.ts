@@ -101,6 +101,24 @@ export function extractPageData(htmlString: string, pageURL: string): ExtractedP
   };
 }
 
-async function getHTML(url: string){
-  //?
+export async function getHTML(url: string) {
+  try {
+    const resp =  await fetch(url, {headers: {
+      'User-Agent': 'BootCrawler/1.0'}
+    });
+    if (!resp.ok) {
+      console.error(`Response status: ${resp.status}`);
+      return;
+  }
+    const contentType = resp.headers.get('Content-Type');
+    if (contentType && contentType.includes('text/html')) {
+      const result = await resp.text();
+      return result;
+    } else {
+      console.error(`Content type is not text/html: ${contentType}`)
+      return;
+    }
+  } catch (error) {
+    console.error(error);
+  }
 }
