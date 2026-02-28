@@ -122,3 +122,18 @@ export async function getHTML(url: string) {
     console.error(error);
   }
 }
+
+export async function crawlPage(
+  baseURL: string,
+  currentURL: string = baseURL,
+  pages: Record<string, number> = {},
+) {
+if (currentURL !== baseURL) {
+  return pages;
+}
+for (let i = 0; i < pages.length; i++) {
+  if ()) {
+
+  }
+}
+}
