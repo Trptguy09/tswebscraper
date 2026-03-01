@@ -123,17 +123,33 @@ export async function getHTML(url: string) {
   }
 }
 
-export async function crawlPage(
-  baseURL: string,
-  currentURL: string = baseURL,
-  pages: Record<string, number> = {},
-) {
-if (currentURL !== baseURL) {
-  return pages;
-}
-for (let i = 0; i < pages.length; i++) {
-  if ()) {
-
+export async function crawlPage(baseURL: string, currentURL: string = baseURL, pages: Record<string, number> = {}) {
+  
+  // check for consistent domain
+  const currentObj = new URL(currentURL);
+  const baseObj = new URL(baseURL);
+  if (currentObj.hostname !== baseObj.hostname) {
+     return pages;
   }
-}
-}
+  // normalize current url and check if in pages and add to pages if not 
+  const currentN = normalizeURL(currentURL);
+  if (currentN in pages) {
+    pages[currentN]++;
+    return pages;
+  } else {
+    pages[currentN] = 1;
+  }
+  // get data
+  const data  = await getHTML(currentURL);
+  if (!data) {
+    return pages;
+  }
+  //get urls from data and recurse
+  const urlsOnPage = getURLsFromHTML(data, baseURL);
+  console.log(`Crawling: ${currentURL}`);
+  console.log(`Found ${urlsOnPage.length} URLs on page`)
+  for (let i = 0; i < urlsOnPage.length; i++) {
+    pages = await crawlPage(baseURL, urlsOnPage[i], pages);
+    }
+  return pages;
+  }

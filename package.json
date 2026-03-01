@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "jsdom": "^27.0.1",
-    "normalize-url": "^9.0.0"
+    "normalize-url": "^9.0.0",
+    "p-limit": "^7.3.0"
   }
 }
