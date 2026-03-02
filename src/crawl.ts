@@ -1,5 +1,5 @@
 import { JSDOM } from 'jsdom'
-
+import pLimit, { LimitFunction } from 'p-limit';
 
 export function normalizeURL(input: string): string {
   if (!input || !input.trim()) {
@@ -101,28 +101,6 @@ export function extractPageData(htmlString: string, pageURL: string): ExtractedP
   };
 }
 
-export async function getHTML(url: string) {
-  try {
-    const resp =  await fetch(url, {headers: {
-      'User-Agent': 'BootCrawler/1.0'}
-    });
-    if (!resp.ok) {
-      console.error(`Response status: ${resp.status}`);
-      return;
-  }
-    const contentType = resp.headers.get('Content-Type');
-    if (contentType && contentType.includes('text/html')) {
-      const result = await resp.text();
-      return result;
-    } else {
-      console.error(`Content type is not text/html: ${contentType}`)
-      return;
-    }
-  } catch (error) {
-    console.error(error);
-  }
-}
-
 export async function crawlPage(baseURL: string, currentURL: string = baseURL, pages: Record<string, number> = {}) {
   
   // check for consistent domain
@@ -153,3 +131,55 @@ export async function crawlPage(baseURL: string, currentURL: string = baseURL, p
     }
   return pages;
   }
+
+  class ConcurrentCrawler {
+    private baseURL: string;
+    private pages: Record<string, number>;
+    private limit: <T>(fn: () => Promise<T>) => Promise<T>;
+  
+  constructor(baseURL: string, maxConcurrency: number) {
+    this.baseURL = baseURL;
+    this.pages = {}
+    this.limit = pLimit(maxConcurrency);
+  }
+  private addPageVisit(normalizedURL: string): boolean {
+    if (normalizedURL in this.pages) {
+      this.pages[normalizedURL]++;
+      return false;
+    }
+    this.pages[normalizedURL] = 1;
+    return true;
+  }
+  
+  
+  private async getHTML(currentURL: string): Promise<string> {
+    return await this.limit(async () => {
+      try {
+      const resp =  await fetch(currentURL, {headers: {
+        'User-Agent': 'BootCrawler/1.0'}
+      });
+      if (!resp.ok) {
+        console.error(`Response status: ${resp.status}`);
+        throw new Error(`Response status: ${resp.status}`);
+      }
+      const contentType = resp.headers.get('Content-Type');
+      if (contentType && contentType.includes('text/html')) {
+        const result = await resp.text();
+        return result;
+      } else {
+        console.error(`Content type is not text/html: ${contentType}`)
+        throw new Error('unable to get HTML response');
+      }
+    } catch (error) {
+      console.error(error)
+      throw error;
+    }
+  });
+}
+
+private async crawlPage
+
+
+  
+
+}
