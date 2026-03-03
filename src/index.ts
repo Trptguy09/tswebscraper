@@ -1,4 +1,4 @@
-import { crawlPage} from "./crawl";
+import { crawlSiteAsync} from "./crawl";
 
 async function main() {
 
@@ -13,7 +13,7 @@ async function main() {
     } else {
         const baseURL = args[0]
         console.log(`Crawling at ${baseURL}`)
-        const crawl = await crawlPage(baseURL);
+        const crawl = await crawlSiteAsync(baseURL);
         console.log(crawl);
     }
 }

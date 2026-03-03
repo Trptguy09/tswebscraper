@@ -1,5 +1,5 @@
 import { JSDOM } from 'jsdom'
-import pLimit, { LimitFunction } from 'p-limit';
+import pLimit from 'p-limit';
 
 export function normalizeURL(input: string): string {
   if (!input || !input.trim()) {
@@ -101,37 +101,6 @@ export function extractPageData(htmlString: string, pageURL: string): ExtractedP
   };
 }
 
-export async function crawlPage(baseURL: string, currentURL: string = baseURL, pages: Record<string, number> = {}) {
-  
-  // check for consistent domain
-  const currentObj = new URL(currentURL);
-  const baseObj = new URL(baseURL);
-  if (currentObj.hostname !== baseObj.hostname) {
-     return pages;
-  }
-  // normalize current url and check if in pages and add to pages if not 
-  const currentN = normalizeURL(currentURL);
-  if (currentN in pages) {
-    pages[currentN]++;
-    return pages;
-  } else {
-    pages[currentN] = 1;
-  }
-  // get data
-  const data  = await getHTML(currentURL);
-  if (!data) {
-    return pages;
-  }
-  //get urls from data and recurse
-  const urlsOnPage = getURLsFromHTML(data, baseURL);
-  console.log(`Crawling: ${currentURL}`);
-  console.log(`Found ${urlsOnPage.length} URLs on page`)
-  for (let i = 0; i < urlsOnPage.length; i++) {
-    pages = await crawlPage(baseURL, urlsOnPage[i], pages);
-    }
-  return pages;
-  }
-
   class ConcurrentCrawler {
     private baseURL: string;
     private pages: Record<string, number>;
@@ -177,9 +146,41 @@ export async function crawlPage(baseURL: string, currentURL: string = baseURL, p
   });
 }
 
-private async crawlPage
-
-
+private async crawlPage(currentURL: string): Promise<void> {
+  const currentObj = new URL(currentURL);
+  const baseObj = new URL(this.baseURL);
+  if (currentObj.hostname !== baseObj.hostname) {
+     return;
+  }
+  let currentN = normalizeURL(currentURL);
+  if (this.addPageVisit(currentN) === false) {
+    return;
+  }
+  try {
+  const data = await this.getHTML(currentURL);
+  if (!data) {
+    return;
+  }
+  const urlsOnPage = getURLsFromHTML(data, this.baseURL);
+  console.log(`Crawling: ${currentURL}`);
+  console.log(`Found ${urlsOnPage.length} URLs on page`)
+  const crawlPromises = urlsOnPage.map( url => this.crawlPage(url));
+  await Promise.all(crawlPromises);
+  } catch(error) {
+    console.error(`unable to crawl page: ${error}`)
+  }
+}
   
+async crawl() {
+  await this.crawlPage(this.baseURL);
+  return this.pages;
+  }  
+}
 
+export async function crawlSiteAsync(baseURL: string, maxConcurrency: number = 10): Promise<Record<string, number>> {
+  const crawler = new ConcurrentCrawler(
+   baseURL,
+    maxConcurrency)
+  const result = await crawler.crawl()
+  return result;
 }
