@@ -104,19 +104,34 @@ export function extractPageData(htmlString: string, pageURL: string): ExtractedP
   class ConcurrentCrawler {
     private baseURL: string;
     private pages: Record<string, number>;
+    maxPages: number;
+    shouldStop: boolean = false;
+    allTasks: Set<Promise<void>> = new Set();
     private limit: <T>(fn: () => Promise<T>) => Promise<T>;
+    private uniquePagesCount: number = 0;
   
-  constructor(baseURL: string, maxConcurrency: number) {
+  constructor(baseURL: string, maxConcurrency: number, maxPages: number) {
     this.baseURL = baseURL;
-    this.pages = {}
+    this.pages = {};
+    this.maxPages = maxPages;
     this.limit = pLimit(maxConcurrency);
   }
   private addPageVisit(normalizedURL: string): boolean {
+    if (this.shouldStop === true) {
+      return false;
+    }
+    let pagesVisited = Object.keys(this.pages)
+    if (pagesVisited.length === this.maxPages) {
+      this.shouldStop = true;
+      console.log("Reached maximum number of pages to crawl.")
+      return false;
+    }
     if (normalizedURL in this.pages) {
       this.pages[normalizedURL]++;
       return false;
     }
     this.pages[normalizedURL] = 1;
+    this.uniquePagesCount ++;
     return true;
   }
   
@@ -147,6 +162,10 @@ export function extractPageData(htmlString: string, pageURL: string): ExtractedP
 }
 
 private async crawlPage(currentURL: string): Promise<void> {
+  
+  if (this.shouldStop) {
+    return;
+  }
   const currentObj = new URL(currentURL);
   const baseObj = new URL(this.baseURL);
   if (currentObj.hostname !== baseObj.hostname) {
@@ -157,17 +176,33 @@ private async crawlPage(currentURL: string): Promise<void> {
     return;
   }
   try {
-  const data = await this.getHTML(currentURL);
-  if (!data) {
-    return;
-  }
-  const urlsOnPage = getURLsFromHTML(data, this.baseURL);
-  console.log(`Crawling: ${currentURL}`);
-  console.log(`Found ${urlsOnPage.length} URLs on page`)
-  const crawlPromises = urlsOnPage.map( url => this.crawlPage(url));
-  await Promise.all(crawlPromises);
+  
+    const data = await this.getHTML(currentURL);
+    if (!data) {
+      return;
+    }
+    const urlsOnPage = getURLsFromHTML(data, this.baseURL);
+    const crawlPromises: Promise<void>[] = [];
+
+    for (const url of urlsOnPage) {
+      if (this.shouldStop) {
+        break;
+      }
+      const task = this.crawlPage(url);
+      crawlPromises.push(task)
+      this.allTasks.add(task);
+      task.finally(() => {
+      this.allTasks.delete(task);
+      });
+    };
+
+    console.log(`Crawling: ${currentURL}`);
+    console.log(`Found ${urlsOnPage.length} URLs on page`)
+    await Promise.all(crawlPromises);
+    
   } catch(error) {
-    console.error(`unable to crawl page: ${error}`)
+      console.error(`unable to crawl page: ${error}`)
+    };
   }
 }
   
@@ -177,10 +212,12 @@ async crawl() {
   }  
 }
 
-export async function crawlSiteAsync(baseURL: string, maxConcurrency: number = 10): Promise<Record<string, number>> {
+export async function crawlSiteAsync(baseURL: string, maxConcurrency: number = 10, maxPages: number = 100): Promise<Record<string, number>> {
   const crawler = new ConcurrentCrawler(
-   baseURL,
-    maxConcurrency)
+    baseURL,
+    maxConcurrency,
+    maxPages,
+)
   const result = await crawler.crawl()
   return result;
 }
