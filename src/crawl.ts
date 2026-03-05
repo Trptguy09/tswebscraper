@@ -120,18 +120,18 @@ export function extractPageData(htmlString: string, pageURL: string): ExtractedP
     if (this.shouldStop === true) {
       return false;
     }
-    let pagesVisited = Object.keys(this.pages)
-    if (pagesVisited.length === this.maxPages) {
+    if (this.pages[normalizedURL]) {
+      this.pages[normalizedURL]++;
+      return false;
+    }
+
+    if (this.uniquePagesCount >= this.maxPages) {
       this.shouldStop = true;
       console.log("Reached maximum number of pages to crawl.")
       return false;
     }
-    if (normalizedURL in this.pages) {
-      this.pages[normalizedURL]++;
-      return false;
-    }
     this.pages[normalizedURL] = 1;
-    this.uniquePagesCount ++;
+    this.uniquePagesCount++;
     return true;
   }
   
@@ -175,9 +175,14 @@ private async crawlPage(currentURL: string): Promise<void> {
   if (this.addPageVisit(currentN) === false) {
     return;
   }
+  console.log(`Crawling: ${currentURL}`);
+
   try {
   
     const data = await this.getHTML(currentURL);
+    if (this.shouldStop) {
+      return;
+    }
     if (!data) {
       return;
     }
@@ -188,6 +193,7 @@ private async crawlPage(currentURL: string): Promise<void> {
       if (this.shouldStop) {
         break;
       }
+    console.log(`Found ${urlsOnPage.length} URLs on page`)
       const task = this.crawlPage(url);
       crawlPromises.push(task)
       this.allTasks.add(task);
@@ -196,28 +202,29 @@ private async crawlPage(currentURL: string): Promise<void> {
       });
     };
 
-    console.log(`Crawling: ${currentURL}`);
-    console.log(`Found ${urlsOnPage.length} URLs on page`)
     await Promise.all(crawlPromises);
     
   } catch(error) {
       console.error(`unable to crawl page: ${error}`)
     };
   }
-}
+
   
-async crawl() {
+async crawl(): Promise<Record<string, number>> {
+  
   await this.crawlPage(this.baseURL);
+  
+  await Promise.allSettled(this.allTasks);
+  
   return this.pages;
-  }  
+  }
 }
 
-export async function crawlSiteAsync(baseURL: string, maxConcurrency: number = 10, maxPages: number = 100): Promise<Record<string, number>> {
+export async function crawlSiteAsync(baseURL: string, maxConcurrency: number = 5, maxPages: number = 100): Promise<Record<string, number>> {
   const crawler = new ConcurrentCrawler(
     baseURL,
     maxConcurrency,
     maxPages,
 )
-  const result = await crawler.crawl()
-  return result;
+  return await crawler.crawl();
 }
