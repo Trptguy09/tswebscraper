@@ -1,4 +1,6 @@
-import { crawlSiteAsync} from "./crawl";
+import { crawlSiteAsync} from "./crawl"
+import { writeJSONReport } from "./report";
+
 
 async function main() {
 
@@ -21,6 +23,8 @@ async function main() {
         if (firstPage) {
             console.log( `First page record: ${firstPage["url"]} - ${firstPage["heading"]}`)
         }
+        console.log(`Total pages crawled: ${Object.keys(pages).length}`);
+        writeJSONReport(pages, "report.json");
     }
 }
 
