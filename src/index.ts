@@ -15,8 +15,12 @@ async function main() {
         const maxConcurrency = Number(args[1]);
         const maxPages = Number(args[2])
         console.log(`Crawling at ${baseURL}`)
-        const crawl = await crawlSiteAsync(baseURL, maxConcurrency, maxPages);
-        console.log(crawl);
+        const pages = await crawlSiteAsync(baseURL, maxConcurrency, maxPages);
+        console.log("Finished crawling.");
+        const firstPage = Object.values(pages)[0];
+        if (firstPage) {
+            console.log( `First page record: ${firstPage["url"]} - ${firstPage["heading"]}`)
+        }
     }
 }
 

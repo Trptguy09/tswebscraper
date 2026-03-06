@@ -85,7 +85,7 @@ export function getImagesFromHTML(htmlString: string, baseURL: string): string[]
 
 export type ExtractedPageData = {
   url: string;
-  h1: string;
+  heading: string;
   first_paragraph: string,
   outgoing_links: string[],
   image_urls: string[],
@@ -94,7 +94,7 @@ export type ExtractedPageData = {
 export function extractPageData(htmlString: string, pageURL: string): ExtractedPageData {
   return {
     url: pageURL,
-    h1: getH1FromHTML(htmlString),
+    heading: getH1FromHTML(htmlString),
     first_paragraph: getFirstParagraphFromHTML(htmlString),
     outgoing_links: getURLsFromHTML(htmlString, pageURL),
     image_urls: getImagesFromHTML(htmlString, pageURL),
@@ -103,12 +103,13 @@ export function extractPageData(htmlString: string, pageURL: string): ExtractedP
 
   class ConcurrentCrawler {
     private baseURL: string;
-    private pages: Record<string, number>;
+    private pages: Record<string, ExtractedPageData>;
     maxPages: number;
     shouldStop: boolean = false;
     allTasks: Set<Promise<void>> = new Set();
     private limit: <T>(fn: () => Promise<T>) => Promise<T>;
     private uniquePagesCount: number = 0;
+    private visited = new Set<string>();
   
   constructor(baseURL: string, maxConcurrency: number, maxPages: number) {
     this.baseURL = baseURL;
@@ -120,8 +121,7 @@ export function extractPageData(htmlString: string, pageURL: string): ExtractedP
     if (this.shouldStop === true) {
       return false;
     }
-    if (this.pages[normalizedURL]) {
-      this.pages[normalizedURL]++;
+    if (this.visited.has(normalizedURL)) {
       return false;
     }
 
@@ -130,7 +130,7 @@ export function extractPageData(htmlString: string, pageURL: string): ExtractedP
       console.log("Reached maximum number of pages to crawl.")
       return false;
     }
-    this.pages[normalizedURL] = 1;
+    this.visited.add(normalizedURL);
     this.uniquePagesCount++;
     return true;
   }
@@ -179,22 +179,25 @@ private async crawlPage(currentURL: string): Promise<void> {
 
   try {
   
-    const data = await this.getHTML(currentURL);
+    const html = await this.getHTML(currentURL);
     if (this.shouldStop) {
       return;
     }
-    if (!data) {
+    if (!html) {
+      console.log("unable to fetch html")
       return;
     }
-    const urlsOnPage = getURLsFromHTML(data, this.baseURL);
-    const crawlPromises: Promise<void>[] = [];
+    const pageData = extractPageData(html, currentURL);
+    this.pages[currentN] = pageData;
+    console.log(`Found ${pageData.outgoing_links.length} links and ${pageData.image_urls.length} images on ${currentURL}`);
 
-    for (const url of urlsOnPage) {
+    const crawlPromises: Promise<void>[] = [];
+    
+    for (const page of pageData.outgoing_links) {
       if (this.shouldStop) {
         break;
       }
-    console.log(`Found ${urlsOnPage.length} URLs on page`)
-      const task = this.crawlPage(url);
+    const task = this.crawlPage(page);
       crawlPromises.push(task)
       this.allTasks.add(task);
       task.finally(() => {
@@ -210,7 +213,7 @@ private async crawlPage(currentURL: string): Promise<void> {
   }
 
   
-async crawl(): Promise<Record<string, number>> {
+async crawl(): Promise<Record<string, ExtractedPageData>> {
   
   await this.crawlPage(this.baseURL);
   
@@ -220,7 +223,7 @@ async crawl(): Promise<Record<string, number>> {
   }
 }
 
-export async function crawlSiteAsync(baseURL: string, maxConcurrency: number = 5, maxPages: number = 100): Promise<Record<string, number>> {
+export async function crawlSiteAsync(baseURL: string, maxConcurrency: number = 5, maxPages: number = 100): Promise<Record<string, ExtractedPageData>> {
   const crawler = new ConcurrentCrawler(
     baseURL,
     maxConcurrency,
